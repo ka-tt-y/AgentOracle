@@ -1,0 +1,8 @@
+{
+  "monad-testnet": {
+    "HealthMonitor": {
+      "address": "0x21C428ac50C45E16a6f8E8234c9A3E039D7A4DfA",
+      "startBlock": 10840249
+    }
+  }
+}

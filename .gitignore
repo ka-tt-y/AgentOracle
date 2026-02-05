@@ -1,0 +1,61 @@
+# Node modules
+/node_modules
+package-lock.json
+
+# Compilation output
+/dist
+
+# pnpm deploy output
+/bundle
+
+# Hardhat Build Artifacts
+/artifacts
+
+# Hardhat compilation (v2) support directory
+/cache
+
+# Typechain output
+/types
+/typechain-types
+
+# Hardhat coverage reports
+/coverage
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Deployment artifacts
+deployments/
+*.deployment.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+training_results.json
+
+# Hardhat
+.hardhat/
+
+# Token assets
+assets/*.png
+assets/*.jpg
+!assets/.gitkeep
+
+# nad.fun output
+nadfun-token-creation.json
+

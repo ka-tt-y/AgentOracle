@@ -1,0 +1,7 @@
+# Assets Directory
+
+This directory should contain:
+- **token-logo.png**: Token logo for nad.fun (512x512 PNG)
+- **demo-screenshots/**: Screenshots for documentation
+
+Create these assets before deploying to mainnet.
