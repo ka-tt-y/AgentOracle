@@ -122,26 +122,42 @@ const SYSTEM_PROMPTS = {
 
 For each check, you receive: ping result (success/fail + latency), historical health score, uptime %, consecutive failure count, total checks, response time trends (avg, σ, recent direction), and optional validation data.
 
-Decision rules:
-- "healthy": Agent is up, responding within normal parameters, no anomalies.
-- "suspicious": Minor issues detected — elevated latency, intermittent failures (3+ consecutive), inconsistent response data, or response time anomaly (>avg+2σ). Explain what you see.
-- "critical": Agent is down, unresponsive, returning spoofed/fabricated data, or exhibiting malicious patterns. Recommend a slashPercent (10 for downtime, 25-45 for spoofing/malicious behavior).
+IMPORTANT GUIDELINES:
+- Be LENIENT with new agents (totalChecks < 10). They are still building history. If responding, default to "healthy".
+- A single failure is NOT critical. Only mark "suspicious" after 3+ consecutive failures.
+- High response times alone are not concerning if the agent is responding successfully.
+- Only mark "critical" for clear evidence of malicious behavior, spoofing, or extended downtime (5+ failures).
 
-Use "anomalyDetails" to describe any anomalies you detect: latency spikes, gradual degradation, response format changes, suspicious patterns, metadata inconsistencies, or signs of data fabrication. Be specific — mention actual numbers and what they mean. If no anomaly, set to null.
+Decision rules:
+- "healthy": Agent is up and responding. This is the DEFAULT for any successful response.
+- "suspicious": Genuine concerns — 3+ consecutive failures, clear spoofing signals, or consistent degradation pattern. Explain specifically.
+- "critical": ONLY for severe cases — agent completely down (5+ failures), proven data fabrication, or malicious behavior. Recommend slashPercent (10-15 for downtime, 25-45 only for proven spoofing/malicious).
+
+Use "anomalyDetails" only for REAL anomalies you detect with evidence. Latency variance is normal. Minor issues are not anomalies. If nothing concerning, set to null.
 
 Failure types: "none" (all good), "timeout" (slow/no response), "error" (HTTP error or crash), "spoofed" (fabricated data), "degraded" (working but declining), "unknown" (can't determine).
 
-Write a clear, descriptive reason. You have room to explain your reasoning — don't be terse.`,
+Write a balanced, fair assessment. Err on the side of leniency — false positives damage agent reputation unfairly.`,
 
-    responseValidator: `You validate AI agent health endpoint responses for the AgentOracle platform. Your goal is to determine whether a response is genuine, well-formed, and consistent with a healthy agent.
+    responseValidator: `You validate AI agent health endpoint responses for the AgentOracle platform. Your goal is to determine whether a response is genuine and well-formed.
 
-Check for:
-- Valid JSON with meaningful health indicators (status, uptime, version, timestamps)
-- Schema compliance — does it look like a real health response?
-- Spoofing signals — static timestamps, copy-pasted data, impossibly perfect metrics, responses that don't change between checks
-- Confidence 0-100 in your assessment
+A VALID health response:
+- Returns JSON with a status indicator (status: "ok", "healthy", "up", etc.)
+- May include: uptime, version, timestamp, agent name
+- Simple responses like {"status":"ok"} or {"status":"ok","uptime":123} are COMPLETELY VALID
 
-List any issues you find with specific details.`,
+Spoofing requires STRONG evidence:
+- Clearly fabricated data (e.g., impossibly long uptimes like 999999999 years)
+- Copy-pasted generic responses with no agent-specific data
+- Static timestamps that never change across multiple checks (you only see one check, so you cannot determine this)
+
+IMPORTANT:
+- Simple, minimal health responses can be normal — not always suspicious.
+- Real uptime values (even round numbers) are NOT spoofing
+- You only see ONE response, so you CANNOT claim it "doesn't change between checks"
+- When in doubt, set isSpoofed: false
+
+Confidence 0-100. Only flag isSpoofed: true with CLEAR evidence of fabrication.`,
 
     trustAnalyst: `You are the trust analyst for AgentOracle, writing assessments that other agents and humans read before deciding to interact with an agent.
 
@@ -285,7 +301,7 @@ export async function generateTrustNarrative(
 **Monitored:** ${healthData.isMonitored}
 **Staked Amount:** ${healthData.stakedAmount ? formatEther(BigInt(healthData.stakedAmount)) : '0'} ORCL
 
-**Reputation:** ${reputationData.mean.toFixed(1)} / 5.0 from ${reputationData.count} reviews
+**Reputation Score:** ${reputationData.mean.toFixed(1)} (from ${reputationData.count} health check feedback${reputationData.count !== 1 ? 's' : ''})
 
 **Response Time Trends:**
 - Average: ${trends.avgTime.toFixed(0)}ms
@@ -409,6 +425,8 @@ export async function makeHealthDecision(
 
 ### Validation
 ${validationResult ? `- Valid: ${validationResult.isValid}\n- Spoofed: ${validationResult.isSpoofed}\n- Confidence: ${validationResult.confidence}%\n- Issues: ${validationResult.issues.length > 0 ? validationResult.issues.join('; ') : 'None'}` : 'Skipped — no validation data available'}
+
+NOTE: The validation data above is from an automated check and may contain false positives. Use your own judgment based on the actual response data. A simple {"status":"ok"} response is valid, not spoofed.
 
 Analyze this data and provide your health decision with full reasoning.`;
 

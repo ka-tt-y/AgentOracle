@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { formatEther } from 'viem'
 import {
   ArrowLeft,
   Activity,
@@ -12,16 +14,66 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Power,
+  Loader2,
 } from 'lucide-react'
-import { fetchTrustReport, formatTimeAgo, getStatusFromScore } from '../api'
+import { fetchTrustReport, formatTimeAgo, getStatusFromScore, notifyAgentUnregistered } from '../api'
 import type { TrustReport } from '../api'
+import { CONTRACTS, IdentityRegistryABI, HealthMonitorABI } from '../contracts'
 
 export default function AgentDetail() {
   const { agentId } = useParams<{ agentId: string }>()
   const navigate = useNavigate()
+  const { address, isConnected } = useAccount()
   const [report, setReport] = useState<TrustReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false)
+
+  // Check if connected wallet owns this agent
+  const { data: ownerAddress } = useReadContract({
+    address: CONTRACTS.IdentityRegistry as `0x${string}`,
+    abi: IdentityRegistryABI,
+    functionName: 'ownerOf',
+    args: agentId ? [BigInt(agentId)] : undefined,
+  })
+
+  const isOwner = isConnected && address && ownerAddress && 
+    address.toLowerCase() === (ownerAddress as string).toLowerCase()
+
+  // Unregister (disable monitoring) transaction
+  const { 
+    writeContract: unregister, 
+    data: unregisterHash,
+    isPending: isUnregistering,
+    error: unregisterError,
+  } = useWriteContract()
+
+  const { isLoading: isConfirming, isSuccess: isUnregistered } = useWaitForTransactionReceipt({
+    hash: unregisterHash,
+  })
+
+  const handleUnregister = () => {
+    if (!agentId) return
+    unregister({
+      address: CONTRACTS.HealthMonitor as `0x${string}`,
+      abi: HealthMonitorABI,
+      functionName: 'disableMonitoring',
+      args: [BigInt(agentId)],
+    })
+  }
+
+  // After successful unregister, notify backend and redirect
+  useEffect(() => {
+    if (isUnregistered && agentId) {
+      setShowUnregisterConfirm(false)
+      // Notify backend to immediately remove from directory
+      notifyAgentUnregistered(agentId).then(() => {
+        // Redirect to directory after short delay
+        setTimeout(() => navigate('/directory', { state: { refresh: true } }), 2000)
+      })
+    }
+  }, [isUnregistered])
 
   const loadReport = async () => {
     if (!agentId) return
@@ -328,6 +380,99 @@ export default function AgentDetail() {
             >
               <RefreshCw className={`w-4 h-4 inline ${loading ? 'animate-spin' : ''}`} />
             </button>
+          </div>
+        )}
+
+        {/* Owner Actions - Unregister */}
+        {isOwner && report.isMonitored && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-8 p-6 rounded-xl bg-red-900/20 border border-red-700/30"
+          >
+            <h3 className="text-lg font-bold text-red-300 mb-2 flex items-center gap-2">
+              <Power className="w-5 h-5" />
+              Owner Actions
+            </h3>
+            <p className="text-gray-400 text-sm mb-4">
+              You own this agent. You can unregister it to stop monitoring and reclaim your staked ORACLE tokens.
+            </p>
+            <button
+              onClick={() => setShowUnregisterConfirm(true)}
+              className="px-6 py-3 bg-red-700/50 hover:bg-red-700/70 border border-red-600/50 text-red-200 font-semibold rounded-xl transition-colors flex items-center gap-2"
+            >
+              <Power className="w-5 h-5" />
+              Unregister Agent
+            </button>
+          </motion.div>
+        )}
+
+        {/* Unregister Confirmation Modal */}
+        {showUnregisterConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-gray-900 border border-red-700/50 rounded-2xl p-6 max-w-md w-full"
+            >
+              <h3 className="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6" />
+                Unregister Agent?
+              </h3>
+              <p className="text-gray-300 mb-4">
+                This will disable monitoring for <strong className="text-amber-400">{report.name || `Agent #${agentId}`}</strong> and return your staked tokens.
+              </p>
+              {report.stakedAmount && BigInt(report.stakedAmount) > 0n && (
+                <p className="text-green-400 mb-4 p-3 bg-green-900/30 rounded-lg">
+                  💰 You will receive <strong>{formatEther(BigInt(report.stakedAmount))} ORACLE</strong> back
+                </p>
+              )}
+              {unregisterError && (
+                <p className="text-red-400 mb-4 p-3 bg-red-900/30 rounded-lg text-sm">
+                  Error: {unregisterError.message}
+                </p>
+              )}
+              {isConfirming && unregisterHash && (
+                <p className="text-blue-400 mb-4 p-3 bg-blue-900/30 rounded-lg text-sm">
+                  ⏳ Transaction submitted!{' '}
+                  <a
+                    href={`https://monadexplorer.com/tx/${unregisterHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-300"
+                  >
+                    View on Explorer
+                  </a>
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUnregisterConfirm(false)}
+                  disabled={isUnregistering || isConfirming}
+                  className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUnregister}
+                  disabled={isUnregistering || isConfirming}
+                  className="flex-1 px-4 py-3 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isUnregistering || isConfirming ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {isConfirming ? 'Confirming...' : 'Signing...'}
+                    </>
+                  ) : (
+                    <>
+                      <Power className="w-5 h-5" />
+                      Confirm Unregister
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </div>

@@ -30,16 +30,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://backend:4000}
-        - VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
-        - VITE_API_SECRET_KEY=${VITE_API_SECRET_KEY}
-        - VITE_IDENTITY_REGISTRY=${VITE_IDENTITY_REGISTRY}
-        - VITE_ORACLE_TOKEN=${VITE_ORACLE_TOKEN}
-        - VITE_REPUTATION_REGISTRY=${VITE_REPUTATION_REGISTRY}
-        - VITE_HEALTH_MONITOR=${VITE_HEALTH_MONITOR}
+
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     restart: unless-stopped

@@ -171,8 +171,9 @@ function buildDailyPost(stats: DailyStats): { title: string; content: string } {
 ${stats.topAgent ? `🏆 **Top agent:** ${stats.topAgent.name} (score: ${stats.topAgent.score})` : ''}
 
 ---
-*Autonomous report by AgentOracle — AI-powered health monitoring on Monad.*
-*Profile: [moltbook.com/u/AgentOracle](https://www.moltbook.com/u/AgentOracle)*
+*Autonomous report by AgentOracle — AI-powered health monitoring on Monad.* \n
+*Profile: [moltbook.com/u/AgentOracle](https://www.moltbook.com/u/AgentOracle)* \n
+*View Stats on Dashboard: [agent-oracle.xyz/directory](https://agent-oracle.xyz/directory)*
 
 #AgentOracle #monadMainnet #AIAgents #OnChainReputation`;
 
@@ -471,13 +472,53 @@ export async function startDailyStatsLoop(): Promise<void> {
 
   console.log('🦞 Moltbook daily stats loop enabled — posting every 24h');
 
+  // Ensure submolt exists
+  const submoltName = await getDefaultSubmolt();
+  await ensureSubmoltExists(submoltName);
+
   setTimeout(async () => {
-    // First post
-    // await postDailyStats();
+    // First post after startup delay
+    await postDailyStats();
+    console.log(`First daily stats posted to Moltbook. Next post in 24h.`);
 
     // Then every 24h
     setInterval(async () => {
       await postDailyStats();
     }, TWENTY_FOUR_HOURS);
   }, INITIAL_DELAY);
+}
+
+/**
+ * Ensure the submolt exists, create it if it doesn't
+ */
+async function ensureSubmoltExists(submoltName: string): Promise<void> {
+  const apiKey = await getMoltbookKey();
+  if (!apiKey) return;
+
+  try {
+    // Check if submolt exists by trying to fetch it
+    const res = await fetch(`${MOLTBOOK_BASE}/submolts/${submoltName}`, {
+      headers: authHeaders(apiKey),
+    });
+
+    if (res.ok) {
+      console.log(`🦞 Submolt m/${submoltName} exists ✅`);
+      return;
+    }
+
+    if (res.status === 404) {
+      // Submolt doesn't exist, create it
+      console.log(`🦞 Creating submolt m/${submoltName}...`);
+      const created = await createSubmolt({
+        name: submoltName,
+        display_name: 'AgentOracle',
+        description: 'Autonomous health monitoring and trust infrastructure for AI agents on Monad. Daily network statistics and agent health reports.',
+      });
+      if (created) {
+        console.log(`🦞 Submolt m/${submoltName} created ✅`);
+      }
+    }
+  } catch (err) {
+    console.warn('🦞 Could not check/create submolt:', (err as Error).message);
+  }
 }

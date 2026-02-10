@@ -144,7 +144,7 @@ export default function RegisterAgent() {
       )}
       <div>
                       <h3 className="text-amber-400 font-semibold text-sm mb-3">Get test ORACLE tokens</h3>
-                      <TokenTransferWidget />
+                      <TokenTransferWidget onSuccess={refetchBalance} />
                     </div>
 
       <div>
@@ -234,7 +234,7 @@ export default function RegisterAgent() {
               <span className="text-green-300 font-bold">Agent Registered Successfully!</span>
             </div>
             {txHash && (
-              <a href={`https://testnet.monadexplorer.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-sm">
+              <a href={`https://monadexplorer.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-sm">
                 <ExternalLink className="w-3.5 h-3.5" /> View on Monad Explorer
               </a>
             )}
@@ -325,7 +325,7 @@ export default function RegisterAgent() {
                   <div key={c.label} className="flex items-center justify-between">
                     <span className="text-gray-500">{c.label}</span>
                     <div className="flex items-center gap-1">
-                      <a href={`https://testnet.monadexplorer.com/address/${c.addr}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-amber-400">{c.addr.slice(0, 6)}...{c.addr.slice(-4)}</a>
+                      <a href={`https://monadexplorer.com/address/${c.addr}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-amber-400">{c.addr.slice(0, 6)}...{c.addr.slice(-4)}</a>
                       <CopyBtn text={c.addr} />
                     </div>
                   </div>

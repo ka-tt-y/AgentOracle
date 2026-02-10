@@ -273,3 +273,97 @@ export async function setConfig(key: string, value: any): Promise<void> {
     { upsert: true }
   );
 }
+
+// ─── Faucet Claim Tracking ───────────────────────────────────────────
+export interface FaucetClaimDocument {
+  address: string;
+  amount: number;
+  txHash: string;
+  claimedAt: Date;
+}
+
+export async function getFaucetClaimsCollection(): Promise<Collection<FaucetClaimDocument>> {
+  const database = await connectDB();
+  return database.collection<FaucetClaimDocument>('faucet_claims');
+}
+
+export async function hasFaucetClaim(address: string): Promise<boolean> {
+  const collection = await getFaucetClaimsCollection();
+  const claim = await collection.findOne({ address: address.toLowerCase() });
+  return claim !== null;
+}
+
+export async function recordFaucetClaim(address: string, amount: number, txHash: string): Promise<void> {
+  const collection = await getFaucetClaimsCollection();
+  await collection.insertOne({
+    address: address.toLowerCase(),
+    amount,
+    txHash,
+    claimedAt: new Date(),
+  });
+}
+
+// ─── Suspicious Count Tracking ───────────────────────────────────────
+// Track consecutive suspicious decisions per agent to only slash after threshold
+export interface SuspiciousCountDocument {
+  agentId: string;
+  consecutiveSuspicious: number;
+  lastSuspiciousAt: Date;
+  totalSuspicious: number;
+  lastSlashedAt?: Date;
+}
+
+export async function getSuspiciousCountCollection(): Promise<Collection<SuspiciousCountDocument>> {
+  const database = await connectDB();
+  return database.collection<SuspiciousCountDocument>('suspicious_counts');
+}
+
+/**
+ * Increment suspicious count for an agent. Returns true if threshold reached (should slash).
+ * Resets count after slashing.
+ */
+export async function incrementSuspiciousCount(agentId: string, threshold = 6): Promise<boolean> {
+  const collection = await getSuspiciousCountCollection();
+  const result = await collection.findOneAndUpdate(
+    { agentId },
+    {
+      $inc: { consecutiveSuspicious: 1, totalSuspicious: 1 },
+      $set: { lastSuspiciousAt: new Date() },
+      $setOnInsert: { agentId },
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+  
+  const count = result?.consecutiveSuspicious || 0;
+  
+  // If threshold reached, reset counter and mark as slashed
+  if (count >= threshold) {
+    await collection.updateOne(
+      { agentId },
+      { $set: { consecutiveSuspicious: 0, lastSlashedAt: new Date() } }
+    );
+    return true; // Should slash
+  }
+  
+  return false; // Don't slash yet
+}
+
+/**
+ * Reset suspicious count when agent has a healthy check
+ */
+export async function resetSuspiciousCount(agentId: string): Promise<void> {
+  const collection = await getSuspiciousCountCollection();
+  await collection.updateOne(
+    { agentId },
+    { $set: { consecutiveSuspicious: 0 } }
+  );
+}
+
+/**
+ * Get current suspicious count for an agent
+ */
+export async function getSuspiciousCount(agentId: string): Promise<number> {
+  const collection = await getSuspiciousCountCollection();
+  const doc = await collection.findOne({ agentId });
+  return doc?.consecutiveSuspicious || 0;
+}

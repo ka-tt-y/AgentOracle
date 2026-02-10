@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: HealthMonitor
-    network: monad-testnet
+    network: monad
     source:
-      address: "0xB1F14D5124fb25420DDe8C32b353cA1c84720270"
+      address: "0x2616D6477D4d2d2eBE8a39bd46AbCe59fD0a4861"
       abi: HealthMonitor
-      startBlock: 11937640
+      startBlock: 54528075
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

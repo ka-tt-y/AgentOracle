@@ -154,22 +154,26 @@ export function setupRoutes(
         cached
       );
 
-      // Build health score history from subgraph events or fall back
+      // Build health score history from subgraph events or fall back to DB
+      // Subgraph has on-chain events (success/fail), DB has full LLM decisions with reasons
       let healthHistory: { timestamp: string; healthScore: number; decision: string; reason?: string }[] = [];
-      if (healthEvents.length > 0) {
-        healthHistory = healthEvents.map((e: any) => ({
-          timestamp: new Date(Number(e.timestamp) * 1000).toISOString(),
-          healthScore: Number(e.newHealthScore),
-          decision: e.decision,
-          reason: e.reason,
-        }));
-      } else {
-        const dbHealthEvents = await db.getHealthHistory(agentId, 50);
+      
+      // Prefer DB events as they have full decision context (decision + reason from LLM)
+      const dbHealthEvents = await db.getHealthHistory(agentId, 50);
+      if (dbHealthEvents.length > 0) {
         healthHistory = dbHealthEvents.map((e) => ({
           timestamp: e.timestamp.toISOString(),
           healthScore: e.healthScore,
           decision: e.decision,
           reason: e.reason,
+        }));
+      } else if (healthEvents.length > 0) {
+        // Fallback to subgraph if DB has no events (derive decision from success field)
+        healthHistory = healthEvents.map((e: any) => ({
+          timestamp: new Date(Number(e.blockTimestamp) * 1000).toISOString(),
+          healthScore: Number(e.newScore),
+          decision: e.success ? 'healthy' : 'unhealthy',
+          reason: e.success ? 'Check passed' : 'Check failed',
         }));
       }
 
@@ -215,29 +219,49 @@ export function setupRoutes(
     }
   });
 
-  // GET /agents — list all monitored agents from DB
+  // GET /agents — list all monitored agents, enriched with live subgraph data
   app.get('/agents', getEndpointRateLimit, async (_req, res) => {
     try {
       const agents = await db.getAllAgents(true);
-      const transformed = agents.map(a => ({
-        agentId: a.agentId,
-        name: a.name || null,
-        description: a.description || null,
-        endpoint: a.endpoint || null,
-        owner: a.owner || null,
-        imageUrl: a.imageUrl || null,
-        healthScore: a.healthScore ?? 100,
-        uptime: (a.totalChecks ?? 0) > 0 ? ((a.successfulChecks ?? 0) / a.totalChecks) * 100 : 100,
-        avgResponseTime: a.avgResponseTimeMs ?? 0,
-        reputation: a.reputationMean ?? 0,
-        feedbackCount: a.feedbackCount ?? 0,
-        lastCheck: a.lastChecked ? new Date(a.lastChecked).toISOString() : new Date().toISOString(),
-        status: a.healthScore >= 80 ? 'healthy' : a.healthScore >= 50 ? 'degraded' : 'unhealthy',
-        totalChecks: a.totalChecks ?? 0,
-        successfulChecks: a.successfulChecks ?? 0,
-        failedChecks: (a.totalChecks ?? 0) - (a.successfulChecks ?? 0),
+
+      // Fetch live data from subgraph for all agents to keep stats in sync
+      const enriched = await Promise.all(agents.map(async (a) => {
+        let healthScore = a.healthScore ?? 100;
+        let totalChecks = a.totalChecks ?? 0;
+        let successfulChecks = a.successfulChecks ?? 0;
+
+        // Try to get live data from subgraph/contract
+        try {
+          const { agent: sgAgent } = await fetchSubgraphAgent(thegraphUrl, a.agentId);
+          if (sgAgent) {
+            healthScore = Number(sgAgent.healthScore);
+            totalChecks = Number(sgAgent.totalChecks);
+            successfulChecks = Number(sgAgent.successfulChecks);
+          }
+        } catch { /* use DB fallback */ }
+
+        const uptime = totalChecks > 0 ? (successfulChecks / totalChecks) * 100 : 100;
+
+        return {
+          agentId: a.agentId,
+          name: a.name || null,
+          description: a.description || null,
+          endpoint: a.endpoint || null,
+          owner: a.owner || null,
+          imageUrl: a.imageUrl || null,
+          healthScore,
+          uptime,
+          avgResponseTime: a.avgResponseTimeMs ?? 0,
+          reputation: a.reputationMean ?? 0,
+          feedbackCount: a.feedbackCount ?? 0,
+          lastCheck: a.lastChecked ? new Date(a.lastChecked).toISOString() : new Date().toISOString(),
+          status: healthScore >= 80 ? 'healthy' : healthScore >= 50 ? 'degraded' : 'unhealthy',
+          totalChecks,
+          successfulChecks,
+          failedChecks: totalChecks - successfulChecks,
+        };
       }));
-      res.json(transformed);
+      res.json(enriched);
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch agents', details: (err as Error).message });
     }
@@ -402,11 +426,71 @@ export function setupRoutes(
     }
   });
 
-  // POST /faucet — transfer test ORACLE tokens to a wallet (testnet only)
+  // POST /agents/unregister — immediately mark agent as unmonitored in DB + unpin from IPFS
+  app.post('/agents/unregister', postEndpointRateLimit, async (req, res) => {
+    const { agentId } = req.body;
+    if (!agentId) {
+      return res.status(400).json({ error: 'Missing required field: agentId' });
+    }
+
+    try {
+      // Mark as unmonitored in DB
+      await db.upsertAgent({
+        agentId: agentId.toString(),
+        isMonitored: false,
+        lastDecision: 'unregistered',
+        lastReason: 'Agent unregistered by owner',
+        lastChecked: Date.now(),
+      });
+      console.log(`Agent ${agentId} marked as unmonitored in DB`);
+
+      // Unpin agent card from IPFS via Pinata
+      if (pinata) {
+        try {
+          const tokenUri: string = await publicClient.readContract({
+            address: identityRegistry,
+            abi: [{ name: 'tokenURI', type: 'function', stateMutability: 'view', inputs: [{ name: 'tokenId', type: 'uint256' }], outputs: [{ name: '', type: 'string' }] }] as const,
+            functionName: 'tokenURI',
+            args: [BigInt(agentId)],
+          });
+          // tokenUri is like "ipfs://Qm..." or "ipfs://bafy..."
+          const cid = tokenUri.replace('ipfs://', '').split('/')[0];
+          if (cid) {
+            // List files matching this CID and delete them
+            const files = await pinata.files.public.list().cid(cid);
+            const fileIds = (files.files || []).map((f: any) => f.id);
+            if (fileIds.length > 0) {
+              await pinata.files.public.delete(fileIds);
+              console.log(`🗑️ Unpinned ${fileIds.length} IPFS file(s) (CID: ${cid}) for agent ${agentId}`);
+            }
+          }
+        } catch (unpinErr) {
+          // Non-critical — log but don't fail the unregister
+          console.warn(`Failed to unpin IPFS for agent ${agentId}:`, (unpinErr as Error).message);
+        }
+      }
+
+      res.json({ success: true, agentId, message: 'Agent has been unregistered and agent card unpinned from IPFS' });
+    } catch (err) {
+      console.error('Error unregistering agent:', err);
+      res.status(500).json({ error: 'Failed to unregister agent', details: (err as Error).message });
+    }
+  });
+
+  // POST /faucet — transfer test ORACLE tokens to a wallet (one-time per address)
   app.post('/faucet', postEndpointRateLimit, async (req, res) => {
     const { recipient, amount } = req.body;
     if (!recipient) {
       return res.status(400).json({ error: 'Missing required field: recipient' });
+    }
+
+    // Check if address has already claimed
+    const alreadyClaimed = await db.hasFaucetClaim(recipient);
+    if (alreadyClaimed) {
+      return res.status(400).json({ 
+        error: 'Address has already claimed test tokens',
+        message: 'Each address can only claim test tokens once to prevent abuse.'
+      });
     }
 
     const tokenAmount = Number(amount) || 15;
@@ -429,6 +513,8 @@ export function setupRoutes(
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
       if (receipt.status === 'success') {
+        // Record the claim to prevent future claims
+        await db.recordFaucetClaim(recipient, tokenAmount, txHash);
         res.json({ success: true, txHash, amount: tokenAmount });
       } else {
         res.status(500).json({ error: 'Transaction failed on-chain' });

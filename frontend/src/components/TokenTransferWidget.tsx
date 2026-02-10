@@ -4,7 +4,7 @@ import { Loader2, CheckCircle, AlertTriangle, Send, Copy } from 'lucide-react'
 import { requestFaucet } from '../api'
 import { useAccount } from 'wagmi'
 
-export default function TokenTransferWidget() {
+export default function TokenTransferWidget({ onSuccess }: { onSuccess?: () => void } = {}) {
   const { address, isConnected } = useAccount()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -28,6 +28,7 @@ export default function TokenTransferWidget() {
       if (result.success && result.txHash) {
         setSuccess(true)
         setTxHash(result.txHash)
+        onSuccess?.()
       } else {
         setError(result.error || 'Transfer failed')
       }

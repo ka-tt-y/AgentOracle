@@ -168,15 +168,16 @@ export async function fetchSubgraphAgent(
         healthUpdateds(
           first: 50
           where: { agentId: "${agentId}" }
-          orderBy: timestamp
+          orderBy: blockTimestamp
           orderDirection: desc
         ) {
           id
           agentId
-          timestamp
-          newHealthScore
-          decision
-          reason
+          blockTimestamp
+          oldScore
+          newScore
+          success
+          responseTime
         }
       }`
     });

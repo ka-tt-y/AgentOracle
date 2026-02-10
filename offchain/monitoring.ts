@@ -71,8 +71,10 @@ export async function checkAndDecide(
     }
 
     const pingResult = await pingEndpoint(endpoint);
-    const totalChecks = Number(health.totalChecks || 1);
-    const uptimePercent = Number(health.successfulChecks) * 100 / totalChecks;
+    const totalChecks = Number(health.totalChecks);
+    const uptimePercent = totalChecks > 0
+      ? (Number(health.successfulChecks) * 100) / totalChecks
+      : 100; // New agent with no checks yet — default to 100%
     const avgResponseTime = Number(health.successfulChecks) > 0
       ? Number(health.totalResponseTime) / Number(health.successfulChecks)
       : 0;
@@ -148,16 +150,34 @@ export async function checkAndDecide(
         address: healthMonitor,
         abi: healthAbi,
         functionName: 'updateHealth',
-        args: [agentId, BigInt(pingResult.responseTimeMs), pingResult.success],
+        args: [agentId, BigInt(pingResult.responseTimeMs), true],
       });
+      // Reset suspicious count on healthy decision
+      await db.resetSuspiciousCount(agentId.toString());
     } else if (decision.decision === 'suspicious') {
-      const reason = `${decision.reason}${decision.failureType !== 'none' ? ` [${decision.failureType}]` : ''}`;
+      // Always record the health check
       await walletClient.writeContract({
         address: healthMonitor,
         abi: healthAbi,
-        functionName: 'reportSuspicious',
-        args: [agentId, reason],
+        functionName: 'updateHealth',
+        args: [agentId, BigInt(pingResult.responseTimeMs), pingResult.success],
       });
+      
+      // Track suspicious count - only slash after 6 consecutive suspicious decisions
+      const shouldSlash = await db.incrementSuspiciousCount(agentId.toString(), 6);
+      if (shouldSlash) {
+        const reason = `${decision.reason}${decision.failureType !== 'none' ? ` [${decision.failureType}]` : ''}`;
+        console.log(`Agent ${agentId}: 6 consecutive suspicious decisions - slashing 5%`);
+        await walletClient.writeContract({
+          address: healthMonitor,
+          abi: healthAbi,
+          functionName: 'reportSuspicious',
+          args: [agentId, reason],
+        });
+      } else {
+        const currentCount = await db.getSuspiciousCount(agentId.toString());
+        console.log(`Agent ${agentId}: suspicious decision (${currentCount}/6 before slash)`);
+      }
     } else if (decision.decision === 'critical') {
       await walletClient.writeContract({
         address: healthMonitor,

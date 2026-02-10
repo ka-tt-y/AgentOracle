@@ -270,6 +270,21 @@ export async function notifyAgentRegistered(params: {
 }
 
 /**
+ * Notify backend about an unregistered agent so it's removed from directory immediately.
+ */
+export async function notifyAgentUnregistered(agentId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/agents/unregister`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId }),
+    })
+  } catch (err) {
+    console.warn('Failed to notify backend about unregistered agent:', err)
+  }
+}
+
+/**
  * Request test ORACLE tokens from the backend faucet (for testing only).
  * Will be depreciated soon
  */

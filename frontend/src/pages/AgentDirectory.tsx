@@ -27,8 +27,8 @@ export default function AgentDirectory() {
 
   useEffect(() => {
     loadAgents()
-    // Refresh every 30 seconds
-    const interval = setInterval(loadAgents, 30000)
+    // Refresh every 60 seconds
+    const interval = setInterval(loadAgents, 60000)
     return () => clearInterval(interval)
   }, [])
 

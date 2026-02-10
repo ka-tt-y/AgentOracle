@@ -1,8 +1,8 @@
 import { defineChain } from 'viem'
 
 export const monadMainnet = defineChain({
-  id: 41454,
-  name: 'Monad Mainnet',
+  id: 143,
+  name: 'Monad',
   nativeCurrency: {
     decimals: 18,
     name: 'Monad',
@@ -10,14 +10,14 @@ export const monadMainnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://testnet-rpc.monad.xyz'],
+      http: ['https://rpc.monad.xyz'],
     },
   },
   blockExplorers: {
     default: {
       name: 'Monad Explorer',
-      url: 'https://explorer.testnet.monad.xyz',
+      url: 'https://monadexplorer.com',
     },
   },
-  testnet: true,
+  testnet: false,
 })
