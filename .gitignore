@@ -59,3 +59,5 @@ assets/*.jpg
 # nad.fun output
 nadfun-token-creation.json
 
+deploy/
+mongo-init.js

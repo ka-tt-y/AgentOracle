@@ -86,3 +86,20 @@ type SuspiciousReported @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
+
+type MonitoredAgent @entity(immutable: false) {
+  id: ID!
+  agentId: BigInt!
+  endpoint: String!
+  stakedAmount: BigInt!
+  healthScore: Int!
+  consecutiveFailures: Int!
+  totalChecks: Int!
+  successfulChecks: Int!
+  totalSlashed: BigInt!
+  suspiciousCount: Int!
+  lastCheckTimestamp: BigInt!
+  isActive: Boolean!
+  createdAt: BigInt!
+  updatedAt: BigInt!
+}

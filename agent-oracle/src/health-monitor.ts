@@ -13,6 +13,7 @@ import {
   HealthUpdated,
   MonitoringDisabled,
   MonitoringEnabled,
+  MonitoredAgent,
   RoleAdminChanged,
   RoleGranted,
   RoleRevoked,
@@ -20,8 +21,33 @@ import {
   StakeAdded,
   SuspiciousReported
 } from "../generated/schema"
+import { BigInt } from "@graphprotocol/graph-ts"
+
+// Helper to get or create MonitoredAgent
+function getOrCreateAgent(agentId: BigInt, timestamp: BigInt): MonitoredAgent {
+  let id = agentId.toString()
+  let agent = MonitoredAgent.load(id)
+  if (agent == null) {
+    agent = new MonitoredAgent(id)
+    agent.agentId = agentId
+    agent.endpoint = ""
+    agent.stakedAmount = BigInt.fromI32(0)
+    agent.healthScore = 100
+    agent.consecutiveFailures = 0
+    agent.totalChecks = 0
+    agent.successfulChecks = 0
+    agent.totalSlashed = BigInt.fromI32(0)
+    agent.suspiciousCount = 0
+    agent.lastCheckTimestamp = timestamp
+    agent.isActive = false
+    agent.createdAt = timestamp
+    agent.updatedAt = timestamp
+  }
+  return agent
+}
 
 export function handleHealthUpdated(event: HealthUpdatedEvent): void {
+  // Store immutable event record
   let entity = new HealthUpdated(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   )
@@ -36,6 +62,20 @@ export function handleHealthUpdated(event: HealthUpdatedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.healthScore = event.params.newScore
+  agent.lastCheckTimestamp = event.block.timestamp
+  agent.totalChecks = agent.totalChecks + 1
+  if (event.params.success) {
+    agent.successfulChecks = agent.successfulChecks + 1
+    agent.consecutiveFailures = 0
+  } else {
+    agent.consecutiveFailures = agent.consecutiveFailures + 1
+  }
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }
 
 export function handleMonitoringDisabled(event: MonitoringDisabledEvent): void {
@@ -50,6 +90,13 @@ export function handleMonitoringDisabled(event: MonitoringDisabledEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.isActive = false
+  agent.stakedAmount = BigInt.fromI32(0)
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }
 
 export function handleMonitoringEnabled(event: MonitoringEnabledEvent): void {
@@ -65,6 +112,16 @@ export function handleMonitoringEnabled(event: MonitoringEnabledEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.endpoint = event.params.endpoint
+  agent.stakedAmount = event.params.stakedAmount
+  agent.isActive = true
+  agent.healthScore = 100
+  agent.consecutiveFailures = 0
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }
 
 export function handleRoleAdminChanged(event: RoleAdminChangedEvent): void {
@@ -125,6 +182,13 @@ export function handleSlashed(event: SlashedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.totalSlashed = agent.totalSlashed.plus(event.params.amount)
+  agent.stakedAmount = agent.stakedAmount.minus(event.params.amount)
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }
 
 export function handleStakeAdded(event: StakeAddedEvent): void {
@@ -139,6 +203,12 @@ export function handleStakeAdded(event: StakeAddedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.stakedAmount = agent.stakedAmount.plus(event.params.amount)
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }
 
 export function handleSuspiciousReported(event: SuspiciousReportedEvent): void {
@@ -153,4 +223,10 @@ export function handleSuspiciousReported(event: SuspiciousReportedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update aggregated MonitoredAgent state
+  let agent = getOrCreateAgent(event.params.agentId, event.block.timestamp)
+  agent.suspiciousCount = agent.suspiciousCount + 1
+  agent.updatedAt = event.block.timestamp
+  agent.save()
 }

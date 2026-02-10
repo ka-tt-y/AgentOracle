@@ -7,7 +7,7 @@ export default function Layout() {
     <div className="min-h-screen relative">
       <AnimatedBackground />
       <Navigation />
-      <main className="ml-0 md:ml-64 transition-all duration-300 relative z-10 pt-4">
+      <main className="ml-0 md:ml-64 transition-all duration-300 relative z-10 pt-16 md:pt-4">
         <Outlet />
       </main>
     </div>

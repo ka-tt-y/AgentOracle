@@ -1,8 +1,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 const AgentOracle = buildModule("AgentOracle", (m) => {
-  // Deploy AuthToken first
-  const authToken = m.contract("AuthToken", []);
+  // Deploy OracleToken first
+  const oracleToken = m.contract("OracleToken", []);
 
   // Deploy IdentityRegistry
   const identityRegistry = m.contract("IdentityRegistry", []);
@@ -10,22 +10,27 @@ const AgentOracle = buildModule("AgentOracle", (m) => {
   // Deploy ReputationRegistry with IdentityRegistry address
   const reputationRegistry = m.contract("ReputationRegistry", [identityRegistry]);
 
-  // Deploy ValidationRegistry with IdentityRegistry address
-  const validationRegistry = m.contract("ValidationRegistry", [identityRegistry]);
 
   // Deploy HealthMonitor with all dependencies
   const healthMonitor = m.contract("HealthMonitor", [
     identityRegistry,
     reputationRegistry,
-    authToken,
+    oracleToken,
     m.getAccount(0), // deployer as initial updater
   ]);
 
+  // ─── Post-deploy permission grants ───────────────────────────────
+
+  // Allow HealthMonitor to register agents on behalf of users (for onboardAgent)
+  m.call(identityRegistry, "addRegistrar", [healthMonitor], { id: "addRegistrar_HealthMonitor" });
+
+  // Whitelist HealthMonitor as an automated system in ReputationRegistry
+  m.call(reputationRegistry, "addAutomatedSystem", [healthMonitor], { id: "addAutomatedSystem_HealthMonitor" });
+
   return {
-    authToken,
+    oracleToken,
     identityRegistry,
     reputationRegistry,
-    validationRegistry,
     healthMonitor,
   };
 });

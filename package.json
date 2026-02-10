@@ -6,7 +6,7 @@
     "start": "tsx offchain/agent_oracle.ts",
     "agent:example": "tsx offchain/example-autonomous-agent.ts",
     "agent:managed-example": "tsx offchain/example-managed-agent.ts",
-    "deploy": "hardhat ignition deploy ./ignition/modules/AgentOracle.ts --network monadTestnet"
+    "deploy": "hardhat ignition deploy ./ignition/modules/AgentOracle.ts --network monadMainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.7",
@@ -24,8 +24,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.9",
-    "@langchain/core": "^1.1.19",
-    "@langchain/openai": "^1.2.4",
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "axios": "^1.13.4",
@@ -35,9 +33,12 @@
     "express": "^5.2.1",
     "form-data": "^4.0.5",
     "graphql-request": "^7.4.0",
+    "groq-sdk": "^0.37.0",
     "install": "^0.13.0",
-    "langchain": "^1.2.17",
+    "mongodb": "^7.1.0",
     "npm": "^11.9.0",
-    "openai": "^6.17.0"
+    "openai": "^6.17.0",
+    "pinata": "^2.5.3",
+    "zod": "^3.25.76"
   }
 }

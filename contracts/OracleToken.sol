@@ -5,15 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title AuthToken
- * @notice ERC-20 utility token for the AuthUptimeAgent ecosystem
+ * @title OracleToken
+ * @notice ERC-20 utility token for the Oracle Agent ecosystem
  * @dev Used for staking, fees, and slashing
  */
-contract AuthToken is ERC20, Ownable {
+contract OracleToken is ERC20, Ownable {
     
-    uint256 public constant INITIAL_SUPPLY = 1_000_000_000 * 10**18; // 1 billion tokens
+    uint256 public constant INITIAL_SUPPLY = 10_000_000_000 * 10**18; // 10 billion tokens
     
-    constructor() ERC20("Auth Token", "AUTH") Ownable(msg.sender) {
+    constructor() ERC20("Oracle Token", "ORACLE") Ownable(msg.sender) {
         _mint(msg.sender, INITIAL_SUPPLY);
     }
     

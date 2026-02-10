@@ -8,9 +8,9 @@ dataSources:
     name: HealthMonitor
     network: monad-testnet
     source:
-      address: "0x21C428ac50C45E16a6f8E8234c9A3E039D7A4DfA"
+      address: "0xB1F14D5124fb25420DDe8C32b353cA1c84720270"
       abi: HealthMonitor
-      startBlock: 10840249
+      startBlock: 11937640
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -19,6 +19,7 @@ dataSources:
         - HealthUpdated
         - MonitoringDisabled
         - MonitoringEnabled
+        - MonitoredAgent
         - RoleAdminChanged
         - RoleGranted
         - RoleRevoked

@@ -1,8 +1,8 @@
 import { defineChain } from 'viem'
 
-export const monadTestnet = defineChain({
+export const monadMainnet = defineChain({
   id: 41454,
-  name: 'Monad Testnet',
+  name: 'Monad Mainnet',
   nativeCurrency: {
     decimals: 18,
     name: 'Monad',

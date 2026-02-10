@@ -1,8 +1,7 @@
-// Color scheme: Emerald/Gold/Orange/Coral (no blue or purple)
 export const colors = {
   primary: 'from-emerald-500 to-teal-600',
   accent: 'from-orange-500 to-amber-600',
-  secondary: 'from-coral-500 to-orange-500', // Note: coral is a custom color, using red-500 fallback
+  secondary: 'from-coral-500 to-orange-500',
   success: 'from-emerald-400 to-green-600',
   highlight: 'from-amber-400 to-yellow-600',
   

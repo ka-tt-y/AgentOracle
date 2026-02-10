@@ -25,7 +25,12 @@ contract IdentityRegistry is ERC721URIStorage, Ownable, EIP712 {
     // agentId => metadataKey => metadataValue (includes "agentWallet")
     mapping(uint256 => mapping(string => bytes)) private _metadata;
     
+    // Authorized registrars (contracts that can register on behalf of users)
+    mapping(address => bool) public registrars;
+    
     event Registered(uint256 indexed agentId, string agentURI, address indexed owner);
+    event RegistrarAdded(address indexed registrar);
+    event RegistrarRemoved(address indexed registrar);
     event MetadataSet(
         uint256 indexed agentId,
         string indexed indexedMetadataKey,
@@ -47,18 +52,6 @@ contract IdentityRegistry is ERC721URIStorage, Ownable, EIP712 {
     {}
     
     /**
-     * @notice Register a new agent (no URI)
-     * @return agentId The newly created agent's ID
-     */
-    function register() external returns (uint256 agentId) {
-        agentId = _lastId++;
-        _metadata[agentId]["agentWallet"] = abi.encodePacked(msg.sender);
-        _safeMint(msg.sender, agentId);
-        emit Registered(agentId, "", msg.sender);
-        emit MetadataSet(agentId, "agentWallet", "agentWallet", abi.encodePacked(msg.sender));
-    }
-    
-    /**
      * @notice Register a new agent with agentURI
      * @param agentURI The URI pointing to the agent registration file
      * @return agentId The newly created agent's ID
@@ -73,27 +66,39 @@ contract IdentityRegistry is ERC721URIStorage, Ownable, EIP712 {
     }
     
     /**
-     * @notice Register with URI and metadata
+     * @notice Add an authorized registrar (e.g., HealthMonitor)
+     * @param registrar Address of the contract allowed to register on behalf of users
+     */
+    function addRegistrar(address registrar) external onlyOwner {
+        require(registrar != address(0), "Invalid address");
+        registrars[registrar] = true;
+        emit RegistrarAdded(registrar);
+    }
+    
+    /**
+     * @notice Remove an authorized registrar
+     * @param registrar Address to remove
+     */
+    function removeRegistrar(address registrar) external onlyOwner {
+        registrars[registrar] = false;
+        emit RegistrarRemoved(registrar);
+    }
+    
+    /**
+     * @notice Register a new agent on behalf of another address (only authorized registrars)
+     * @param owner The address that will own the agent NFT
      * @param agentURI The URI pointing to the agent registration file
-     * @param metadata Array of metadata entries
      * @return agentId The newly created agent's ID
      */
-    function register(string memory agentURI, MetadataEntry[] memory metadata) 
-        external 
-        returns (uint256 agentId) 
-    {
+    function registerFor(address owner, string memory agentURI) external returns (uint256 agentId) {
+        require(registrars[msg.sender], "Not authorized registrar");
+        require(owner != address(0), "Invalid owner");
         agentId = _lastId++;
-        _metadata[agentId]["agentWallet"] = abi.encodePacked(msg.sender);
-        _safeMint(msg.sender, agentId);
+        _metadata[agentId]["agentWallet"] = abi.encodePacked(owner);
+        _safeMint(owner, agentId);
         _setTokenURI(agentId, agentURI);
-        emit Registered(agentId, agentURI, msg.sender);
-        emit MetadataSet(agentId, "agentWallet", "agentWallet", abi.encodePacked(msg.sender));
-        
-        for (uint256 i; i < metadata.length; i++) {
-            require(keccak256(bytes(metadata[i].metadataKey)) != RESERVED_AGENT_WALLET_KEY_HASH, "reserved key");
-            _metadata[agentId][metadata[i].metadataKey] = metadata[i].metadataValue;
-            emit MetadataSet(agentId, metadata[i].metadataKey, metadata[i].metadataKey, metadata[i].metadataValue);
-        }
+        emit Registered(agentId, agentURI, owner);
+        emit MetadataSet(agentId, "agentWallet", "agentWallet", abi.encodePacked(owner));
     }
     
     /**
@@ -256,7 +261,4 @@ contract IdentityRegistry is ERC721URIStorage, Ownable, EIP712 {
         return _isAuthorized(owner, spender, agentId);
     }
     
-    function getVersion() external pure returns (string memory) {
-        return "2.0.0";
-    }
 }

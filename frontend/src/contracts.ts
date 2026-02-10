@@ -1,121 +1,16 @@
-// Contract addresses - UPDATE THESE AFTER DEPLOYMENT
+// ─── Contract Addresses ──────────────────────────────────────────────
+// Set via environment variables or defaults to latest deployment
 export const CONTRACTS = {
-  AgencyToken: '0x...' as `0x${string}`,
-  Reputation: '0x...' as `0x${string}`,
-  Academy: '0x...' as `0x${string}`,
-  Marketplace: '0x...' as `0x${string}`,
-}
+  OracleToken: import.meta.env.VITE_ORACLE_TOKEN,
+  IdentityRegistry: import.meta.env.VITE_IDENTITY_REGISTRY,
+  ReputationRegistry: import.meta.env.VITE_REPUTATION_REGISTRY,
+  HealthMonitor: import.meta.env.VITE_HEALTH_MONITOR,
+} as const;
 
-// ABIs - Minimal versions for frontend
-export const ACADEMY_ABI = [
-  {
-    name: 'isEnrolled',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agent', type: 'address' }],
-    outputs: [{ type: 'bool' }],
-  },
-  {
-    name: 'hasCertification',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agent', type: 'address' }],
-    outputs: [{ type: 'bool' }],
-  },
-  {
-    name: 'getEnrolledCount',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ type: 'uint256' }],
-  },
-  {
-    name: 'enroll',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [],
-    outputs: [],
-  },
-  {
-    name: 'entryFee',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ type: 'uint256' }],
-  },
-] as const
+// ─── ABIs ────────────────────────────────────────────────────────────
 
-export const REPUTATION_ABI = [
-  {
-    name: 'getCertification',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agent', type: 'address' }],
-    outputs: [
-      { name: 'tier', type: 'uint8' },
-      { name: 'academyScore', type: 'uint256' },
-      { name: 'jobsCompleted', type: 'uint256' },
-      { name: 'avgRating', type: 'uint256' },
-      { name: 'specialty', type: 'string' },
-    ],
-  },
-  {
-    name: 'isCertified',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agent', type: 'address' }],
-    outputs: [{ type: 'bool' }],
-  },
-] as const
-
-export const MARKETPLACE_ABI = [
-  {
-    name: 'getOpenJobs',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ type: 'uint256[]' }],
-  },
-  {
-    name: 'getJob',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'jobId', type: 'uint256' }],
-    outputs: [
-      { name: 'client', type: 'address' },
-      { name: 'assignedAgent', type: 'address' },
-      { name: 'title', type: 'string' },
-      { name: 'description', type: 'string' },
-      { name: 'payment', type: 'uint256' },
-      { name: 'status', type: 'uint8' },
-      { name: 'deadline', type: 'uint256' },
-      { name: 'rating', type: 'uint256' },
-    ],
-  },
-  {
-    name: 'acceptJob',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [{ name: 'jobId', type: 'uint256' }],
-    outputs: [],
-  },
-  {
-    name: 'platformRevenue',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ type: 'uint256' }],
-  },
-] as const
-
-export const TOKEN_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ type: 'uint256' }],
-  },
+// OracleToken (ERC-20 token - ORACLE)
+export const OracleTokenABI = [
   {
     name: 'approve',
     type: 'function',
@@ -124,6 +19,215 @@ export const TOKEN_ABI = [
       { name: 'spender', type: 'address' },
       { name: 'amount', type: 'uint256' },
     ],
-    outputs: [{ type: 'bool' }],
+    outputs: [{ name: '', type: 'bool' }],
   },
-] as const
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+// IdentityRegistry (ERC-8004 / ERC-721)
+export const IdentityRegistryABI = [
+  {
+    name: 'register',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'metadataURI', type: 'string' }],
+    outputs: [{ name: 'agentId', type: 'uint256' }],
+  },
+  {
+    name: 'tokenURI',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'string' }],
+  },
+  {
+    name: 'ownerOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'totalSupply',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+// HealthMonitor (the main registration + monitoring contract)
+export const HealthMonitorABI = [
+  // One-transaction onboarding (recommended)
+  {
+    name: 'onboardAgent',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentURI', type: 'string' },
+      { name: 'endpoint', type: 'string' },
+      { name: 'stakeAmount', type: 'uint256' },
+    ],
+    outputs: [{ name: 'agentId', type: 'uint256' }],
+  },
+  // Legacy multi-step registration
+  {
+    name: 'registerForMonitoring',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'endpoint', type: 'string' },
+      { name: 'stakeAmount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'addStake',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'disableMonitoring',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [],
+  },
+  // Read functions
+  {
+    name: 'getHealthData',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      {
+        name: '',
+        type: 'tuple',
+        components: [
+          { name: 'healthScore', type: 'uint8' },
+          { name: 'lastCheckTimestamp', type: 'uint256' },
+          { name: 'totalChecks', type: 'uint256' },
+          { name: 'successfulChecks', type: 'uint256' },
+          { name: 'failedChecks', type: 'uint256' },
+          { name: 'totalResponseTime', type: 'uint256' },
+          { name: 'consecutiveFailures', type: 'uint256' },
+          { name: 'isMonitored', type: 'bool' },
+          { name: 'stakedAmount', type: 'uint256' },
+          { name: 'endpoint', type: 'string' },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'getHealthScore',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
+  {
+    name: 'getUptimePercentage',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'getAverageResponseTime',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'getAgentTrustSummary',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      { name: 'healthScore', type: 'uint8' },
+      { name: 'uptimePercentage', type: 'uint256' },
+      { name: 'avgResponseTime', type: 'uint256' },
+      { name: 'reputationMean', type: 'int256' },
+      { name: 'isActive', type: 'bool' },
+      { name: 'status', type: 'string' },
+    ],
+  },
+  {
+    name: 'minStakeAmount',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  // Events
+  {
+    type: 'event',
+    name: 'MonitoringEnabled',
+    inputs: [
+      { indexed: true, name: 'agentId', type: 'uint256' },
+      { indexed: false, name: 'endpoint', type: 'string' },
+      { indexed: false, name: 'stakedAmount', type: 'uint256' },
+    ],
+  },
+] as const;
+
+// ReputationRegistry
+export const ReputationRegistryABI = [
+  {
+    name: 'submitFeedback',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'uint256' },
+      { name: 'score', type: 'int128' },
+      { name: 'category', type: 'uint8' },
+      { name: 'tag', type: 'string' },
+      { name: 'refId', type: 'string' },
+      { name: 'comment', type: 'string' },
+    ],
+    outputs: [],
+  },
+  {
+    name: 'getSummary',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'agentId', type: 'uint256' }],
+    outputs: [
+      { name: 'count', type: 'uint256' },
+      { name: 'sum', type: 'int256' },
+      { name: 'mean', type: 'int256' },
+      { name: 'lastUpdated', type: 'uint256' },
+    ],
+  },
+] as const;
+
+// ─── Type Helpers ────────────────────────────────────────────────────
+export type ContractName = keyof typeof CONTRACTS;
+export type ContractAddress = `0x${string}`;
+
+export function getContractAddress(name: ContractName): ContractAddress {
+  return CONTRACTS[name] as ContractAddress;
+}

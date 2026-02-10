@@ -2,15 +2,19 @@
 pragma solidity ^0.8.20;
 
 import "./IdentityRegistry.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ReputationRegistry
  * @notice ERC-8004 compliant Reputation Registry for agent feedback
- * @dev Official ERC-8004 implementation with response system and client tracking
+ * @dev Official ERC-8004 implementation with response system, client tracking, and automated system whitelist
  */
-contract ReputationRegistry {
+contract ReputationRegistry is Ownable {
     
     IdentityRegistry public immutable identityRegistry;
+    
+    // Whitelist for automated systems (e.g., HealthMonitor)
+    mapping(address => bool) public automatedSystems;
     
     struct Feedback {
         uint256 agentId;
@@ -56,12 +60,34 @@ contract ReputationRegistry {
         string text
     );
     
-    constructor(address _identityRegistry) {
+    event AutomatedSystemAdded(address indexed system);
+    event AutomatedSystemRemoved(address indexed system);
+    
+    constructor(address _identityRegistry) Ownable(msg.sender) {
         identityRegistry = IdentityRegistry(_identityRegistry);
     }
     
     /**
-     * @notice Submit feedback for an agent (prevents self-feedback)
+     * @notice Add an automated system to the whitelist (e.g., HealthMonitor)
+     * @param system Address of the automated system contract
+     */
+    function addAutomatedSystem(address system) external onlyOwner {
+        require(system != address(0), "Invalid address");
+        automatedSystems[system] = true;
+        emit AutomatedSystemAdded(system);
+    }
+    
+    /**
+     * @notice Remove an automated system from the whitelist
+     * @param system Address of the automated system contract
+     */
+    function removeAutomatedSystem(address system) external onlyOwner {
+        automatedSystems[system] = false;
+        emit AutomatedSystemRemoved(system);
+    }
+    
+    /**
+     * @notice Submit feedback for an agent (prevents self-feedback for non-automated systems)
      * @param agentId The agent's ID
      * @param value Feedback value (can be negative)
      * @param valueDecimals Number of decimal places (0-18)
@@ -80,11 +106,14 @@ contract ReputationRegistry {
         require(identityRegistry.ownerOf(agentId) != address(0), "Agent not registered");
         require(valueDecimals <= 18, "Invalid decimals");
         
-        // Prevent self-feedback
-        require(
-            !identityRegistry.isAuthorizedOrOwner(msg.sender, agentId),
-            "Cannot self-feedback"
-        );
+        // Allow automated systems to bypass self-feedback check
+        if (!automatedSystems[msg.sender]) {
+            // Prevent self-feedback for regular users
+            require(
+                !identityRegistry.isAuthorizedOrOwner(msg.sender, agentId),
+                "Cannot self-feedback"
+            );
+        }
         
         // First time feedback from this client
         if (_feedback[agentId][msg.sender].timestamp == 0) {
@@ -284,7 +313,16 @@ contract ReputationRegistry {
         return result;
     }
     
+    /**
+     * @notice Check if an address is an automated system
+     * @param system Address to check
+     * @return True if whitelisted
+     */
+    function isAutomatedSystem(address system) external view returns (bool) {
+        return automatedSystems[system];
+    }
+    
     function getVersion() external pure returns (string memory) {
-        return "2.0.0";
+        return "2.1.0";
     }
 }
