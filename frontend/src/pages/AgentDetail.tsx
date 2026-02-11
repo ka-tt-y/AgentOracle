@@ -70,7 +70,7 @@ export default function AgentDetail() {
       // Notify backend to immediately remove from directory
       notifyAgentUnregistered(agentId).then(() => {
         // Redirect to directory after short delay
-        setTimeout(() => navigate('/directory', { state: { refresh: true } }), 2000)
+        setTimeout(() => navigate('/directory', { state: { refresh: true } }), 1000)
       })
     }
   }, [isUnregistered])

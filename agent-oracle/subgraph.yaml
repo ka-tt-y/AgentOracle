@@ -8,9 +8,9 @@ dataSources:
     name: HealthMonitor
     network: monad
     source:
-      address: "0x2616D6477D4d2d2eBE8a39bd46AbCe59fD0a4861"
+      address: "0x38f10Ca8392a3055E20D055d64635C4BAC41588F"
       abi: HealthMonitor
-      startBlock: 54528075
+      startBlock: 54678093
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

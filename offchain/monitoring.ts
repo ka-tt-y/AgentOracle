@@ -26,13 +26,13 @@ export async function getMonitoredAgents(
   try {
     const agents = await getMonitoredAgentsFromSubgraph(thegraphUrl);
     console.log(`Found ${agents.length} monitored agents from subgraph`);
-    return agents;
+    if (agents.length > 0) return agents;
   } catch (error) {
     console.error('Error fetching from subgraph, falling back to contract reads:', error);
-    const agents = await getMonitoredAgentsFromContract(publicClient, healthMonitor);
-    console.log(`Found ${agents.length} monitored agents from contract`);
-    return agents;
   }
+  const agents = await getMonitoredAgentsFromContract(publicClient, healthMonitor);
+  console.log(`Found ${agents.length} monitored agents from contract`);
+  return agents;
 }
 
 export async function checkAndDecide(

@@ -478,7 +478,7 @@ export async function startDailyStatsLoop(): Promise<void> {
 
   setTimeout(async () => {
     // First post after startup delay
-    await postDailyStats();
+    // await postDailyStats();
     console.log(`First daily stats posted to Moltbook. Next post in 24h.`);
 
     // Then every 24h

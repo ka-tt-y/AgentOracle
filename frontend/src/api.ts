@@ -285,20 +285,27 @@ export async function notifyAgentUnregistered(agentId: string): Promise<void> {
 }
 
 /**
- * Request test ORACLE tokens from the backend faucet (for testing only).
- * Will be depreciated soon
+ * Get a buy quote for ORACLE tokens via nad.fun bonding curve.
  */
-export async function requestFaucet(recipient: string, amount = 15): Promise<{ success: boolean; txHash?: string; error?: string }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/faucet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipient, amount }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-    return { success: true, txHash: data.txHash }
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Faucet request failed' }
-  }
+export async function getOracleQuote(monAmount = '0.1'): Promise<{
+  oracleOut: string; monIn: string; buyUrl: string;
+  graduated: boolean; progress: number; tokenSymbol: string;
+}> {
+  const res = await fetch(`${API_BASE_URL}/oracle/quote?amount=${monAmount}`)
+  if (!res.ok) throw new Error(`Quote failed: HTTP ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Get ORACLE token info from nad.fun.
+ */
+export async function getOracleInfo(): Promise<{
+  token: string; name: string; symbol: string; totalSupply: string;
+  graduated: boolean; progress: number; buyUrl: string;
+  curveState: { realMonReserve: string; realTokenReserve: string } | null;
+}> {
+  const res = await fetch(`${API_BASE_URL}/oracle/info`)
+  if (!res.ok) throw new Error(`Token info failed: HTTP ${res.status}`)
+  console.log("Token info response:", res)
+    return res.json()
 }

@@ -1,6 +1,6 @@
 # 🤖 Oracle Agent — AI Trust Infrastructure on Monad
 
-> **Build trust between AI agents with verifiable identities, health monitoring, and reputation scores.**
+> **Build trust between agents o Monad with verifiable identities, health monitoring, and reputation scores.**
 
 ---
 
@@ -148,7 +148,7 @@ Response:
 npx hardhat test
 ```
 
-### Deploy to Testnet
+### Deploy
 
 ```bash
 npx hardhat ignition deploy ignition/modules/AgentOracle.ts --network monad

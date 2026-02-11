@@ -130,7 +130,7 @@ IMPORTANT GUIDELINES:
 
 Decision rules:
 - "healthy": Agent is up and responding. This is the DEFAULT for any successful response.
-- "suspicious": Genuine concerns — 3+ consecutive failures, clear spoofing signals, or consistent degradation pattern. Explain specifically.
+- "suspicious": Genuine concerns — 6+ consecutive failures, clear spoofing signals, or consistent degradation pattern. Explain specifically.
 - "critical": ONLY for severe cases — agent completely down (5+ failures), proven data fabrication, or malicious behavior. Recommend slashPercent (10-15 for downtime, 25-45 only for proven spoofing/malicious).
 
 Use "anomalyDetails" only for REAL anomalies you detect with evidence. Latency variance is normal. Minor issues are not anomalies. If nothing concerning, set to null.
@@ -181,7 +181,6 @@ Check:
 - Duplicate risk: Could this be a re-registration of an existing agent?
 - Readiness score 0-100: How ready is this agent for production monitoring?
 
-IMPORTANT: For demo/test registrations with localhost endpoints, be lenient and set isValid=true as long as the name is reasonable.
 Provide actionable suggestions for improvement.`,
 };
 
@@ -231,7 +230,7 @@ async function callGroqStructured<T>(
             const cachedTokens = (response.usage as any)?.prompt_tokens_details?.cached_tokens ?? 0;
 
             if (cachedTokens > 0) {
-                console.log(`📦 Cache hit: ${cachedTokens} tokens cached (${((cachedTokens / (response.usage?.prompt_tokens || 1)) * 100).toFixed(1)}%)`);
+                console.log(`Cache hit: ${cachedTokens} tokens cached (${((cachedTokens / (response.usage?.prompt_tokens || 1)) * 100).toFixed(1)}%)`);
             }
 
             return { result, cachedTokens };
@@ -352,7 +351,6 @@ export async function validateOnboardingData(
         endpointResponse = res.data;
     } catch { /* endpoint not accessible */ }
 
-    // Dynamic content
     const userContent = `Name: "${name}" | Desc: "${description}" | Endpoint: ${endpoint} | Accessible: ${endpointAccessible}
 ${endpointResponse ? `Response: ${JSON.stringify(endpointResponse)}` : 'Endpoint not accessible'}
 Capabilities: ${capabilities?.length ? capabilities.join(', ') : 'none'}
@@ -398,7 +396,6 @@ export async function makeHealthDecision(
 
     const isAnomaly = trends.avgTime > 0 && pingResult.responseTimeMs > trends.avgTime + (2 * trends.stdDev);
 
-    // Rich dynamic content — give the Agent full context to reason about
     const userContent = `## Agent Health Check Report
 
 **Agent:** ${agentId}

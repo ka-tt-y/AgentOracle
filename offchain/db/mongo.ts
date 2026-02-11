@@ -146,6 +146,37 @@ export async function getAllAgents(monitoredOnly = false): Promise<AgentDocument
   return collection.find(filter).sort({ healthScore: -1 }).toArray();
 }
 
+/**
+ * Fully remove all data for an agent from every collection.
+ * Called when an agent unregisters.
+ */
+export async function deleteAgentData(agentId: string): Promise<{ deletedFrom: string[] }> {
+  const deletedFrom: string[] = [];
+  const database = await connectDB();
+
+  // 1. agents collection
+  const agentsResult = await database.collection('agents').deleteOne({ agentId });
+  if (agentsResult.deletedCount > 0) deletedFrom.push('agents');
+
+  // 2. healthEvents collection
+  const eventsResult = await database.collection('healthEvents').deleteMany({ agentId });
+  if (eventsResult.deletedCount > 0) deletedFrom.push(`healthEvents (${eventsResult.deletedCount})`);
+
+  // 3. AgentCache — keys are prefixed with agentId
+  const cacheResult = await database.collection('AgentCache').deleteMany({
+    key: { $regex: `(^|_)${agentId}($|_)` },
+  });
+  if (cacheResult.deletedCount > 0) deletedFrom.push(`AgentCache (${cacheResult.deletedCount})`);
+
+  // 4. suspicious_counts collection
+  const suspResult = await database.collection('suspicious_counts').deleteOne({ agentId });
+  if (suspResult.deletedCount > 0) deletedFrom.push('suspicious_counts');
+
+  // 5. faucet_claims — not agent-specific, skip
+
+  return { deletedFrom };
+}
+
 export async function getAgentsByHealthScore(limit = 10): Promise<AgentDocument[]> {
   const collection = await getAgentsCollection();
   return collection.find({ isMonitored: true }).sort({ healthScore: -1 }).limit(limit).toArray();

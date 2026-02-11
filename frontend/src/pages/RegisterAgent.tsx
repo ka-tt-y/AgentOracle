@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { parseEther, formatEther } from 'viem'
 import { CONTRACTS, HealthMonitorABI, OracleTokenABI } from '../contracts'
 import { prepareOnboard, notifyAgentRegistered } from '../api'
-import TokenTransferWidget from '../components/TokenTransferWidget'
+import BuyOracleWidget from '../components/BuyOracleWidget'
 
 type RegistrationStep = 'idle' | 'approving' | 'registering' | 'success' | 'error'
 
@@ -143,8 +143,8 @@ export default function RegisterAgent() {
         </motion.div>
       )}
       <div>
-                      <h3 className="text-amber-400 font-semibold text-sm mb-3">Get test ORACLE tokens</h3>
-                      <TokenTransferWidget onSuccess={refetchBalance} />
+                      <h3 className="text-amber-400 font-semibold text-sm mb-3">Buy ORACLE tokens</h3>
+                      <BuyOracleWidget onSuccess={refetchBalance} />
                     </div>
 
       <div>

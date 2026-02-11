@@ -1,6 +1,6 @@
 // API routes for Oracle Agent
 import express from 'express';
-import { parseUnits } from 'viem';
+import { initSDK, parseEther as nadfunParseEther, formatEther as nadfunFormatEther } from '@nadfun/sdk';
 import * as db from './db/mongo.js';
 import {
   getAgentFromCache,
@@ -85,11 +85,6 @@ export function setupRoutes(
   thegraphUrl: string,
   pinata: InstanceType<typeof PinataSDK> | null
 ) {
-  // ERC-20 minimal ABI for faucet transfers
-  const erc20Abi = [
-    { type: 'function', name: 'transfer', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ type: 'bool' }], stateMutability: 'nonpayable' },
-    { type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
-  ] as const;
   // GET /health — agent's own liveness
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', agent: 'AgentOracleAgent', uptime: process.uptime() });
@@ -434,15 +429,9 @@ export function setupRoutes(
     }
 
     try {
-      // Mark as unmonitored in DB
-      await db.upsertAgent({
-        agentId: agentId.toString(),
-        isMonitored: false,
-        lastDecision: 'unregistered',
-        lastReason: 'Agent unregistered by owner',
-        lastChecked: Date.now(),
-      });
-      console.log(`Agent ${agentId} marked as unmonitored in DB`);
+      // Remove all agent data from DB
+      const { deletedFrom } = await db.deleteAgentData(agentId.toString());
+      console.log(`Agent ${agentId} removed from DB: ${deletedFrom.length > 0 ? deletedFrom.join(', ') : 'no data found'}`);
 
       // Unpin agent card from IPFS via Pinata
       if (pinata) {
@@ -477,51 +466,90 @@ export function setupRoutes(
     }
   });
 
-  // POST /faucet — transfer test ORACLE tokens to a wallet (one-time per address)
-  app.post('/faucet', postEndpointRateLimit, async (req, res) => {
-    const { recipient, amount } = req.body;
-    if (!recipient) {
-      return res.status(400).json({ error: 'Missing required field: recipient' });
-    }
+  // ─── nad.fun Integration ────────────────────────────────────────────
 
-    // Check if address has already claimed
-    const alreadyClaimed = await db.hasFaucetClaim(recipient);
-    if (alreadyClaimed) {
-      return res.status(400).json({ 
-        error: 'Address has already claimed test tokens',
-        message: 'Each address can only claim test tokens once to prevent abuse.'
+  // Initialize nad.fun SDK (lazy — only when needed)
+  let _nadSDK: ReturnType<typeof initSDK> | null = null;
+  function getNadSDK() {
+    if (!_nadSDK) {
+      const pk = process.env.PRIVATE_KEY;
+      const rpc = process.env.RPC_URL || 'https://rpc.monad.xyz';
+      if (!pk) throw new Error('PRIVATE_KEY not configured');
+      _nadSDK = initSDK({
+        rpcUrl: rpc,
+        privateKey: `0x${pk}` as `0x${string}`,
+        network: 'mainnet',
       });
     }
+    return _nadSDK;
+  }
 
-    const tokenAmount = Number(amount) || 15;
-    if (tokenAmount > 100) {
-      return res.status(400).json({ error: 'Max faucet amount is 100 ORACLE per request' });
-    }
+  const NADFUN_TOKEN = (process.env.NADFUN_TOKEN_ADDRESS || oracleToken) as `0x${string}`;
 
-    if (!oracleToken) {
-      return res.status(503).json({ error: 'OracleToken address not configured' });
-    }
-
+  // GET /oracle/quote — get how much ORACLE you get for X MON
+  app.get('/oracle/quote', getEndpointRateLimit, async (req, res) => {
     try {
-      const txHash = await walletClient.writeContract({
-        address: oracleToken,
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [recipient as `0x${string}`, parseUnits(tokenAmount.toString(), 18)],
+      const monAmount = req.query.amount ? String(req.query.amount) : '0.1';
+      const sdk = getNadSDK();
+      const amountIn = nadfunParseEther(monAmount);
+      const [quote, tokenName, tokenSymbol, progress, isGraduated] = await Promise.all([
+        sdk.getAmountOut(NADFUN_TOKEN, amountIn, true),
+        sdk.getName(NADFUN_TOKEN),
+        sdk.getSymbol(NADFUN_TOKEN),
+        sdk.getProgress(NADFUN_TOKEN),
+        sdk.isGraduated(NADFUN_TOKEN),
+      ]);
+
+      res.json({
+        token: NADFUN_TOKEN,
+        tokenName,
+        tokenSymbol,
+        monIn: monAmount,
+        oracleOut: nadfunFormatEther(quote.amount),
+        router: quote.router,
+        graduated: isGraduated,
+        progress: Number(progress) / 100, // 0-100%
+        buyUrl: `https://nad.fun/tokens/${NADFUN_TOKEN}`,
       });
-
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-      if (receipt.status === 'success') {
-        // Record the claim to prevent future claims
-        await db.recordFaucetClaim(recipient, tokenAmount, txHash);
-        res.json({ success: true, txHash, amount: tokenAmount });
-      } else {
-        res.status(500).json({ error: 'Transaction failed on-chain' });
-      }
     } catch (err) {
-      console.error('Faucet transfer error:', err);
-      res.status(500).json({ error: 'Faucet transfer failed', details: (err as Error).message });
+      console.error('Quote error:', err);
+      res.status(500).json({ error: 'Failed to get quote', details: (err as Error).message });
+    }
+  });
+
+  // GET /oracle/info — token info for the frontend
+  app.get('/oracle/info', getEndpointRateLimit, async (_req, res) => {
+    try {
+      const sdk = getNadSDK();
+      const [tokenName, tokenSymbol, totalSupply, isGraduated, progress] = await Promise.all([
+        sdk.getName(NADFUN_TOKEN),
+        sdk.getSymbol(NADFUN_TOKEN),
+        sdk.getTotalSupply(NADFUN_TOKEN),
+        sdk.isGraduated(NADFUN_TOKEN),
+        sdk.getProgress(NADFUN_TOKEN),
+      ]);
+      let curveState = null;
+      if (!isGraduated) {
+        const state = await sdk.getCurveState(NADFUN_TOKEN);
+        curveState = {
+          realMonReserve: nadfunFormatEther(state.realMonReserve),
+          realTokenReserve: nadfunFormatEther(state.realTokenReserve),
+        };
+      }
+
+      res.json({
+        token: NADFUN_TOKEN,
+        name: tokenName,
+        symbol: tokenSymbol,
+        totalSupply: nadfunFormatEther(totalSupply),
+        graduated: isGraduated,
+        progress: Number(progress) / 100,
+        curveState,
+        buyUrl: `https://nad.fun/tokens/${NADFUN_TOKEN}`,
+      });
+    } catch (err) {
+      console.error('Token info error:', err);
+      res.status(500).json({ error: 'Failed to get token info', details: (err as Error).message });
     }
   });
 }

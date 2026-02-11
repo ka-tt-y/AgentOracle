@@ -90,7 +90,8 @@ async function startAgent() {
     console.log(`   GET  /leaderboard             — top agents`);
     console.log(`   POST /prepareOnboard          — validate + upload agent card (auth required)`);
     console.log(`   POST /agents/notify           — seed new agent in DB (auth required)`);
-    console.log(`   POST /faucet                  — request test ORACLE tokens`);
+    console.log(`   GET  /oracle/quote            — get ORACLE buy quote from nad.fun`);
+    console.log(`   GET  /oracle/info             — ORACLE token info`);
   });
 
   monitoringLoop(publicClient, walletClient, HEALTH_MONITOR, IDENTITY_REGISTRY, REPUTATION_REGISTRY, THEGRAPH_URL)

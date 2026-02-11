@@ -11,7 +11,7 @@ contract HealthMonitor is AccessControl {
 
     IdentityRegistry public immutable identityRegistry;
     ReputationRegistry public immutable reputationRegistry;
-    IERC20 public immutable authToken;
+    IERC20 public immutable oracleToken;
 
     struct HealthData {
         uint8 healthScore; // 0-100
@@ -54,12 +54,12 @@ contract HealthMonitor is AccessControl {
     constructor(
         address _identityRegistry,
         address _reputationRegistry,
-        address _authToken,
+        address _oracleToken,
         address initialUpdater
     ) {
         identityRegistry = IdentityRegistry(_identityRegistry);
         reputationRegistry = ReputationRegistry(_reputationRegistry);
-        authToken = IERC20(_authToken);
+        oracleToken = IERC20(_oracleToken);
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(UPDATER_ROLE, initialUpdater);
@@ -81,7 +81,7 @@ contract HealthMonitor is AccessControl {
         require(bytes(endpoint).length > 0, "Invalid endpoint");
 
         require(
-            authToken.transferFrom(msg.sender, address(this), stakeAmount),
+            oracleToken.transferFrom(msg.sender, address(this), stakeAmount),
             "Stake transfer failed"
         );
 
@@ -179,7 +179,7 @@ contract HealthMonitor is AccessControl {
 
         if (returnAmount > 0) {
             require(
-                authToken.transfer(msg.sender, returnAmount),
+                oracleToken.transfer(msg.sender, returnAmount),
                 "Return failed"
             );
         }
@@ -193,7 +193,7 @@ contract HealthMonitor is AccessControl {
         require(data.isMonitored, "Not monitored");
 
         require(
-            authToken.transferFrom(msg.sender, address(this), amount),
+            oracleToken.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
         );
         data.stakedAmount += amount;
@@ -355,7 +355,7 @@ contract HealthMonitor is AccessControl {
 
         // Stake & monitor
         require(
-            authToken.transferFrom(msg.sender, address(this), stakeAmount),
+            oracleToken.transferFrom(msg.sender, address(this), stakeAmount),
             "Stake transfer failed"
         );
 
